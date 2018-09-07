@@ -1,0 +1,118 @@
+<html>
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <link rel="shortcut icon" href="/static/favicon.ico">
+    <title>No-Faff Dropbooks</title>
+    <style>
+        body{background-color: black;}
+        h1{font-family: "sans-serif"; color:white; margin-bottom: 0; font-weight: 200;}
+        img{width: 150px; max-height: 200px; max-width: 33%;}
+        #links{max-width:750px;}
+        input
+        {
+            text-align: center;
+            width: 100%;
+            color: white;
+            border: none;
+            background-color: black;
+            margin-bottom: 0.5em;
+        }
+    </style>
+
+</head>
+<body>
+    <center>
+        <h1>No-Faff Dropbooks</h1>
+        <input type="text" id="search" placeholder="Search"/>
+        <div id="links"></div>
+    </center>
+</body>
+
+<script>
+var currentPage = 1;
+var loading = false;
+var search = "";
+var searchIn = document.getElementById("search");
+var timeout = null;
+searchIn.oninput = function(ev)
+{
+    clearTimeout(timeout);
+    loading = true;
+    timeout = setTimeout(function()
+    {
+        search = searchIn.value;
+        currentPage = 0;
+        clear();
+        loadPage();
+        loading = false;
+    }, 500);
+};
+function clear()
+{
+    var links = document.getElementById("links");
+    while (links.lastChild)
+    {
+        links.removeChild(links.lastChild);
+    }
+}
+//load the next page of index stuff
+function loadPage()
+{
+    loading = true;
+    var url = "/api/page/"+currentPage;
+    if (search)
+        url += '/'+search;
+    var req = new XMLHttpRequest();
+    req.onreadystatechange = function ()
+    {
+        if (req.readyState == XMLHttpRequest.DONE)
+        {
+            if (req.status == 200)
+            {
+                if (req.responseText == "")
+                    return;
+                var info = JSON.parse(req.responseText);
+                var div = document.getElementById("links");
+                for (var i = 0; i < info.length; i++)
+                {
+                    var a = document.createElement('a');
+                    a.href = "/detail/"+info[i].id;
+                    var img = document.createElement('img');
+                    img.src = "/api/img?url="+info[i].thumb;
+                    img.alt = info[i].title;
+                    img.title=info[i].title;
+                    a.appendChild(img);
+                    div.appendChild(a);
+                }
+            }
+            loading = false;
+        }
+    };
+    req.onabort =
+    req.onerror =
+    req.onloadend = function()
+    {
+        loading = false;
+    };
+    req.open("GET",url,true);
+    req.send();
+    currentPage += 1;
+}
+//check for scrolling and load new stuff if we're near the bottom
+setInterval(function()
+{
+    if (loading)
+        return;
+    var winHeight = (self.innerHeight) ? self.innerHeight : document.body.clientHeight;
+    var pos = window.pageYOffset ? window.pageYOffset : document.documentElement.scrollTop ? document.documentElement.scrollTop : document.body.scrollTop;
+    // if scrollbar reaces to bottom
+    if (document.body.scrollHeight * 0.8 <= (pos + winHeight))
+    {
+        loadPage();
+    }
+},500);
+window.onload=loadPage();
+</script>
+
+</html>

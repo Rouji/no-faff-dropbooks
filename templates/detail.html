@@ -1,0 +1,104 @@
+<html>
+    <head>
+        <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+        <link rel="shortcut icon" href="/static/favicon.ico">
+        <title>{{ book_id }}</title>
+
+<style>
+div {position:absolute; bottom:0; right:0; color: black; background-color: white; font-family: "monospace";}
+img {display: none;}
+a {text-decoration:none;}
+body #imgdiv{
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    height: 100%;
+}
+#imgdiv{
+    background-repeat: no-repeat;
+    background-size: contain;
+    background-position: center center;
+    background-color: black;
+}
+</style>
+
+    </head>
+<body onclick="bodyClick(event);">
+    <div id="imgdiv"></div>
+    <img id="preload" src=""></img>
+    <div><span id="pagecounter">0/0</span> | <a id="download" href="">DL</a></div>
+</body>
+
+<script>
+var book_id = "{{ book_id }}";
+var currentImg = -1;
+var info = null;
+var body = document.getElementsByTagName("body")[0];
+var imgdiv = document.getElementById("imgdiv");
+var preload = document.getElementById("preload");
+var counter = document.getElementById("pagecounter");
+
+function loadDetail(id)
+{
+    var url = "/api/detail/"+book_id;
+    var req = new XMLHttpRequest();
+    req.onreadystatechange = function ()
+    {
+        if (req.readyState == XMLHttpRequest.DONE)
+        {
+            if (req.status == 200)
+            {
+                if (req.responseText == "")
+                    return;
+                info = JSON.parse(req.responseText);
+                document.getElementById("download").href = info.dl_link;
+                document.title = info.title;
+                nextImage();
+            }
+        }
+    };
+    req.open("GET",url,true);
+    req.send();
+}
+
+function mod(a, n) {return a - (n * Math.floor(a/n));}
+function updateCounter()
+{
+    counter.innerHTML = (currentImg+1) + "/" + (info.images.length+1)
+}
+
+
+function nextImage(step)
+{
+    step = typeof step !== 'undefined' ? step : 1
+    currentImg = mod(currentImg + step, info.images.length);
+    imgdiv.style.backgroundImage = "url('/api/img?url="+info.images[currentImg].img+"')";
+    preload.src = "/api/img?url="+info.images[mod(currentImg + step, info.images.length)].img;
+    updateCounter();
+}
+
+function bodyClick(ev)
+{
+    var e = ev ? ev : window.event;
+    bodyWidth = body.offsetWidth;
+    nextImage(e.clientX < (3*bodyWidth)/4 ? 1 : -1)
+    return false;
+}
+
+document.onwheel=function(e)
+{
+        nextImage(e.deltaY > 0 ? 1 : -1);
+}
+
+document.onkeydown=function(e)
+{
+    if (e.keyCode == 39)
+        nextImage();
+    else if (e.keyCode == 37)
+        nextImage(-1);
+}
+window.onload=loadDetail;
+</script>
+
+</html>
