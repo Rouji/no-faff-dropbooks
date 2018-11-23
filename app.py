@@ -2,6 +2,7 @@
 # coding=utf-8
 
 from flask import Flask, jsonify, abort, make_response, request, render_template
+from flask_cache import Cache
 import requests
 import re
 from bs4 import BeautifulSoup
@@ -10,15 +11,16 @@ user_agent = 'Mozilla/5.0 (Macintosh; Intel Mac OS X x.y; rv:10.0) Gecko/2010010
 url_re = re.compile(r'http://.*\.(drop|dl|x)books\.to/.*\.jpe?g')
 
 app = Flask(__name__)
+cache = Cache(app, config={'CACHE_TYPE': 'simple'})
 
 @app.route('/api/page/<int:page>', defaults={'search': None})
 @app.route('/api/page/<int:page>/<search>')
+@cache.memoize(timeout=600)
 def api_page(page, search):
     url = 'http://xbooks.to/tops/index/term:no/page:{page}'
     if search:
         url = 'http://xbooks.to/search/index/word:{search}/term:no/option_word:/search_type:and/page:{page}'
     url = url.format(page=page, search=search)
-    print(url)
 
     req = requests.get(url, headers={'Referer': 'https://xbooks.to/', 'User-Agent': user_agent})
     soup = BeautifulSoup(req.text, 'lxml')
@@ -35,6 +37,7 @@ def api_page(page, search):
     return jsonify(books)
 
 @app.route('/api/detail/<book_id>')
+@cache.memoize(timeout=3600)
 def api_detail(book_id):
     url = 'http://xbooks.to/detail/{book_id}'.format(book_id=book_id)
     req = requests.get(url, headers={'Referer': 'https://xbooks.to/', 'User-Agent': user_agent})
@@ -59,13 +62,20 @@ def api_detail(book_id):
     ]
     return jsonify({'title': title, 'dl_link': dl_link, 'images': images})
 
+def img_key():
+    url = request.values.get('url')
+    if '/thumb' in url:
+        return url.split('/')[-1]
+    elif '/img/' in url:
+        return '/'.join(url.split('/')[-2:])
+
 @app.route('/api/img')
+@cache.cached(timeout=1800, key_prefix=img_key)
 def api_img():
     img_url = request.values.get('url')
     if not img_url or not url_re.match(img_url):
         abort(403)
     req = requests.get(img_url, headers={'Referer': 'https://xbooks.to/', 'User-Agent': user_agent})
-    print(req)
     resp = make_response(req.content)
     resp.headers.set('Content-Type', 'image/jpeg')
     return resp
